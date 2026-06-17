@@ -6,12 +6,6 @@ Keywords: NOC automation, email automation, Langchain, Langgraph, AI NOC agents,
 
 # 🚀 **Network Operations Center (NOC) Email Automation with AI Agents and RAG**
 
-## **Introduction**  
-
-In a **fast-paced Network Operations Center (NOC)**, staff must handle a high volume of alerts and emails, categorize them accurately, and follow specific Standard Operating Procedures (SOPs) to resolve issues. Manually processing these emails, determining the required actions, and referencing documentation consumes **significant time and resources**, often leading to **delays or errors** in critical incident response.
-
-**NOC Email Automation** is an **AI solution** designed to streamline **NOC workflows** for IT teams. Leveraging a **Langgraph-driven workflow**, multiple **AI agents** collaborate to efficiently monitor, categorize, and process incoming NOC emails. Instead of replying directly to the sender, the system drafts **internal, step-by-step NOC action procedures** for officers to follow. It also implements **RAG (Retrieval-Augmented Generation)** technology to retrieve exact instructions from internal SOPs (such as FortiToken management).
-
 ## **Features**  
 
 ### **NOC Inbox Management with AI Agents**  
@@ -39,8 +33,7 @@ In a **fast-paced Network Operations Center (NOC)**, staff must handle a high vo
    - The system synthesizes the core issue from the email.
    - Using **RAG**, it retrieves **accurate SOP steps** from ingested documents.
    - It **drafts an internal action checklist** for the NOC officer.  
-4. **Quality Assurance**: A proofreader agent evaluates the draft for completeness and accuracy, requesting revisions if necessary.  
-5. **Output**: **Approved procedures** are generated, ensuring the NOC team can execute the required actions **promptly and correctly**.  
+4. **Output**: **Approved procedures** are generated, ensuring the NOC team can execute the required actions **promptly and correctly**.  
 
 ## System Flowchart
 
