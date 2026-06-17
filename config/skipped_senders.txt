@@ -1,0 +1,7 @@
+# Block specific addresses
+gemini-notes@google.com
+maxis@service-now.com
+daemon@googlemail.com
+
+# Block entire domains
+@nevigate.net

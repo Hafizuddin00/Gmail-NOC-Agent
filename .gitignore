@@ -1,0 +1,42 @@
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# ── Virtual environment ────────────────────────────────────────────────────────
+venv/
+.venv/
+env/
+
+# ── Environment variables ──────────────────────────────────────────────────────
+.env
+
+# ── Google / OAuth credentials (NEVER commit these) ───────────────────────────
+config/credentials.json
+config/token.json
+
+# ── Runtime state (safe to regenerate, no need to track) ──────────────────────
+config/skipped_threads.json
+
+# ── Confluence guide in .txt format  ──────────────────────────────────────────
+data/*
+!data/.gitkeep
+
+# ── ChromaDB vectorstore (large binary, rebuild with scripts/create_index.py) ─
+db/
+
+# ── IDE / OS ──────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.DS_Store
+Thumbs.db
+
+# ── Misc ──────────────────────────────────────────────────────────────────────
+*.resolved
