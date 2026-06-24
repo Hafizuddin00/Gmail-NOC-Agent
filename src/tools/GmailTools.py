@@ -137,8 +137,9 @@ class GmailToolsClass:
         
     def _create_reply_message(self, email, reply_text, send=False):
         # Create message with proper headers
+        # Always address draft to the NOC inbox — never to the external sender
         message = self._create_html_email_message(
-            recipient=email.sender,
+            recipient=os.environ.get("NOC_EMAIL", os.environ["MY_EMAIL"]),
             subject=email.subject,
             reply_text=reply_text
         )
@@ -330,7 +331,8 @@ class GmailToolsClass:
         """
         message = MIMEMultipart("alternative")
         message["to"] = recipient
-        message["subject"] = f"Re: {subject}" if not subject.startswith("Re: ") else subject
+        base_subject = subject.removeprefix("Re: ").removeprefix("[DO NOT SEND] ")
+        message["subject"] = f"[DO NOT SEND] Re: {base_subject}"
 
         # Simplified HTML Template
         html_text = reply_text.replace("\n", "<br>").replace("\\n", "<br>")

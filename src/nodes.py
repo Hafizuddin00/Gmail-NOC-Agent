@@ -2,10 +2,11 @@
 Graph node implementations — each function maps to one node in the LangGraph workflow.
 """
 
-from colorama import Fore, Style
 import time
 import json
 import os
+import logging
+
 from google.api_core.exceptions import ResourceExhausted, TooManyRequests
 from langchain_google_genai._common import GoogleGenerativeAIError as ChatGoogleGenerativeAIError
 
@@ -14,6 +15,8 @@ from .tools.GmailTools import GmailToolsClass
 from .tools.AttachmentParser import extract_text_attachments
 from .tools.LogDetector import is_log_content
 from .state import GraphState, Email
+
+logger = logging.getLogger(__name__)
 
 SKIPPED_THREADS_FILE = os.path.join(
     os.path.dirname(os.path.dirname(__file__)), "config", "skipped_threads.json"
@@ -48,14 +51,17 @@ def call_with_retry(func, *args, label="Agent", **kwargs):
             err_str = str(e)
             # Daily quota exhausted — no point retrying, raise immediately
             if "PerDay" in err_str or "per_day" in err_str or "limit: 20" in err_str:
-                print(Fore.RED + f"[{label}] Daily quota exhausted. Cannot retry until tomorrow." + Style.RESET_ALL)
+                logger.error(f"[{label}] Daily quota exhausted. Cannot retry until tomorrow.")
                 raise
             if attempt < len(RATE_LIMIT_WAITS):
                 wait = RATE_LIMIT_WAITS[attempt]
-                print(Fore.RED + f"[{label}] Rate limit hit. Waiting {wait}s before retry {attempt+1}/{len(RATE_LIMIT_WAITS)}..." + Style.RESET_ALL)
+                logger.warning(
+                    f"[{label}] Rate limit hit. "
+                    f"Waiting {wait}s before retry {attempt+1}/{len(RATE_LIMIT_WAITS)}..."
+                )
                 time.sleep(wait)
             else:
-                print(Fore.RED + f"[{label}] Rate limit — max retries reached. Skipping." + Style.RESET_ALL)
+                logger.error(f"[{label}] Rate limit — max retries reached. Skipping.")
                 raise
 
 
@@ -66,43 +72,47 @@ class Nodes:
 
     def load_new_emails(self, state: GraphState) -> GraphState:
         """Loads new emails from Gmail and updates the state."""
-        print(Fore.YELLOW + "Loading new emails...\n" + Style.RESET_ALL)
+        logger.info("Loading new emails from Gmail inbox...")
         skipped_threads = load_skipped_threads()
         recent_emails = self.gmail_tools.fetch_unanswered_emails()
 
         emails = []
         for email in recent_emails:
             if email["threadId"] in skipped_threads:
+                logger.debug(f"Skipping thread (in skip list): {email['threadId']}")
                 continue
             # Extract .txt/.log attachments
             attachments = extract_text_attachments(self.gmail_tools.service, email["id"])
             email["attachments"] = attachments
             emails.append(Email(**email))
 
+        logger.info(f"Loaded {len(emails)} new email(s) to process.")
         return {"emails": emails}
 
     def check_new_emails(self, state: GraphState) -> str:
         """Checks if there are new emails to process."""
         if len(state['emails']) == 0:
-            print(Fore.RED + "No new emails" + Style.RESET_ALL)
+            logger.info("Inbox empty — no new emails to process.")
             return "empty"
         else:
-            print(Fore.GREEN + "New emails to process" + Style.RESET_ALL)
+            logger.info(f"Found {len(state['emails'])} email(s) to process.")
             return "process"
-        
+
     def is_email_inbox_empty(self, state: GraphState) -> GraphState:
         return state
 
     def categorize_email(self, state: GraphState) -> GraphState:
         """Categorizes the current email. Forces log_analysis only for thread replies with logs."""
-        print(Fore.YELLOW + "Checking email category...\n" + Style.RESET_ALL)
+        logger.info("Categorizing current email...")
 
         current_email = state["emails"][-1]
 
         # Only force log_analysis for replies in threads that already have a draft
-        # (i.e. no new issue — just a log follow-up)
         if current_email.force_log_analysis:
-            print(Fore.MAGENTA + "Email category: log_analysis (forced — reply in existing thread with log content)" + Style.RESET_ALL)
+            logger.info(
+                "Email category: log_analysis "
+                "(forced — reply in existing thread with log content)"
+            )
             return {"email_category": "log_analysis", "current_email": current_email}
 
         # For all other emails — use LLM to categorize
@@ -113,19 +123,22 @@ class Nodes:
                 label="Categorize"
             )
         except RATE_LIMIT_EXCEPTIONS:
-            print(Fore.RED + "Categorization failed due to quota. Skipping email.\n" + Style.RESET_ALL)
+            logger.error("Categorization failed due to quota. Skipping email.")
             state["emails"].pop()
             return {"email_category": "unrelated", "current_email": current_email}
-
-        print(Fore.MAGENTA + f"Email category: {result.category.value}" + Style.RESET_ALL)
 
         category = result.category.value
 
         # If sender is from @evolutionwellness and not fortitoken, force general_inquiry
         sender = current_email.sender.lower()
         if "@evolutionwellness" in sender and category != "ewh_fortitoken":
-            print(Fore.MAGENTA + "Overriding category to general_inquiry (evolutionwellness sender)" + Style.RESET_ALL)
+            logger.info(
+                f"Overriding category '{category}' → 'general_inquiry' "
+                f"(evolutionwellness sender)"
+            )
             category = "general_inquiry"
+        else:
+            logger.info(f"Email category: {category}")
 
         return {
             "email_category": category,
@@ -134,8 +147,8 @@ class Nodes:
 
     def route_email_based_on_category(self, state: GraphState) -> str:
         """Routes the email based on its category."""
-        print(Fore.YELLOW + "Routing email based on category...\n" + Style.RESET_ALL)
         category = state["email_category"]
+        logger.info(f"Routing email | category={category}")
         if category == "unrelated":
             return "unrelated"
         elif category == "log_analysis":
@@ -157,7 +170,7 @@ class Nodes:
 
     def construct_rag_queries(self, state: GraphState) -> GraphState:
         """Constructs RAG queries and retrieves information in one step."""
-        print(Fore.YELLOW + "Retrieving information from internal knowledge...\n" + Style.RESET_ALL)
+        logger.info("Retrieving information from internal knowledge base (RAG)...")
         email_content = state["current_email"].body
         email_category = state["email_category"]
 
@@ -166,6 +179,7 @@ class Nodes:
         docs = self.agents.retriever.invoke(search_query)
         retrieved = "\n\n".join([doc.page_content for doc in docs])
 
+        logger.info(f"RAG retrieved {len(docs)} document(s).")
         return {
             "rag_queries": [search_query],
             "retrieved_documents": retrieved
@@ -177,8 +191,8 @@ class Nodes:
 
     def write_draft_email(self, state: GraphState) -> GraphState:
         """Writes a draft NOC action procedure based on the current email and retrieved information."""
-        print(Fore.YELLOW + "Writing NOC action procedure...\n" + Style.RESET_ALL)
-        
+        logger.info("Writing NOC action procedure (draft email)...")
+
         # Format input to the writer agent
         email = state["current_email"]
 
@@ -191,7 +205,7 @@ class Nodes:
             log_content = email.body
 
         if log_content:
-            print(Fore.CYAN + "Analyzing log content...\n" + Style.RESET_ALL)
+            logger.info("Log content detected — running log analysis...")
             try:
                 log_analysis = call_with_retry(
                     self.agents.log_analyzer.invoke,
@@ -199,7 +213,7 @@ class Nodes:
                     label="LogAnalyzer"
                 )
             except Exception as e:
-                print(Fore.RED + f"Log analysis failed: {e}" + Style.RESET_ALL)
+                logger.error(f"Log analysis failed: {e}", exc_info=True)
 
         attachment_section = (
             f'\n\n# **LOG CONTENT:**\n{log_content}'
@@ -227,6 +241,7 @@ class Nodes:
         email = draft_result.email
         state["emails"].pop()
 
+        logger.info("Draft email written successfully.")
         return {
             "generated_email": email,
             "trials": 0,
@@ -235,7 +250,7 @@ class Nodes:
 
     def write_log_analysis(self, state: GraphState) -> GraphState:
         """Runs log analysis directly — skips RAG, outputs findings only."""
-        print(Fore.CYAN + "Running log analysis...\n" + Style.RESET_ALL)
+        logger.info("Running direct log analysis (no RAG)...")
 
         email = state["current_email"]
         log_content = email.attachments or email.body
@@ -247,6 +262,7 @@ class Nodes:
         )
 
         state["emails"].pop()
+        logger.info("Log analysis complete.")
         return {
             "generated_email": analysis,
             "trials": 0,
@@ -255,14 +271,15 @@ class Nodes:
 
     def create_draft_response(self, state: GraphState) -> GraphState:
         """Creates a draft response in Gmail."""
-        print(Fore.YELLOW + "Creating draft email...\n" + Style.RESET_ALL)
+        logger.info("Creating Gmail draft reply...")
         self.gmail_tools.create_draft_reply(state["current_email"], state["generated_email"])
+        logger.info("Gmail draft created successfully.")
         return {"retrieved_documents": "", "trials": 0}
-    
+
     def skip_unrelated_email(self, state):
         """Skip unrelated email permanently and remove from emails list."""
         email = state["emails"][-1]
-        print(Fore.RED + f"Skipping unrelated email permanently: {email.threadId}\n" + Style.RESET_ALL)
+        logger.info(f"Skipping unrelated email permanently | threadId={email.threadId}")
         save_skipped_thread(email.threadId)
         state["emails"].pop()
         return state
