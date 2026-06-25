@@ -6,15 +6,16 @@
 
 setlocal
 
-set "ROOT=%~dp0..\.."
+set "ROOT=%~dp0"
+set "ROOT=%ROOT:~0,-1%"
 set "PID_FILE=%ROOT%\agent.pid"
 set "LOG_FILE=%ROOT%\logs\agent.log"
 
 echo ============================================================
-echo  Gmail NOC Agent — Status
+echo  Gmail NOC Agent - Status
 echo ============================================================
 
-:: ── Check PID file ─────────────────────────────────────────────
+:: Check PID file
 if not exist "%PID_FILE%" (
     echo  Status : STOPPED ^(no PID file found^)
 ) else (
@@ -25,13 +26,13 @@ if not exist "%PID_FILE%" (
         echo  Status : RUNNING
         echo  PID    : %PID%
     ) else (
-        echo  Status : STOPPED ^(stale PID file — process not found^)
+        echo  Status : STOPPED ^(stale PID file - process not found^)
         echo  Run stop_agent.bat to clean up.
     )
 )
 
 echo.
-echo ── Last 30 log lines ────────────────────────────────────────
+echo -- Last 30 log lines ----------------------------------------
 
 if not exist "%LOG_FILE%" (
     echo  ^(log file not found yet^)
@@ -40,11 +41,12 @@ if not exist "%LOG_FILE%" (
 )
 
 echo.
-echo ── Commands ─────────────────────────────────────────────────
+echo -- Commands -------------------------------------------------
 echo   start_agent.bat        Start the agent in background
 echo   stop_agent.bat         Stop the running agent
 echo   status_agent.bat       Show this status screen
 echo   tail_log.bat           Live-tail the log file
 echo ============================================================
 
+pause
 endlocal

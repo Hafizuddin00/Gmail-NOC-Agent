@@ -13,25 +13,39 @@ INTERNAL NOC ACTION PROCEDURE
 Request Type : {category}
 
 SUMMARY OF REQUEST:
-[One sentence summary]
+[One sentence summary — do NOT repeat circuit details here, they are in the header below]
+
+CIRCUIT DETAILS:
+Provider            : [Provider Company from INFORMATION section, or N/A]
+Provider CID        : [Provider Circuit Reference from INFORMATION section, or N/A]
+Customer            : [Customer Company from INFORMATION section, or N/A]
+Customer CID        : [Customer Circuit Reference from INFORMATION section, or N/A]
+End Customer        : [End Customer Company from INFORMATION section, or N/A]
+Installation Address: [End Customer Installation Address from INFORMATION section, or N/A]
+LAN IP              : [IP Address LAN from INFORMATION section, or N/A]
+WAN IP              : [IP Address WAN from INFORMATION section, or N/A]
 
 ACTION STEPS FOR NOC OFFICER:
-[Numbered steps]
+[Numbered steps — concise, no repeating circuit details already in the header above]
 
 NOTES:
-[Caveats, escalation paths, SOP references]
+[Caveats, escalation paths, SOP references only]
 
 Rules:
 - Be specific and actionable.
+- Keep action steps short and concise. Do NOT repeat Provider, Customer, CID, or IP details in the steps — they are already in CIRCUIT DETAILS above.
 - If LOG ANALYSIS is provided, add a LOG ANALYSIS SUMMARY section at the end.
 - If SOP info is insufficient, include a step to escalate to team lead.
 - Return only the procedure document, no preamble.
+- NEVER invent or guess URLs, links, ticket numbers, or system references. Only include URLs or links that appear verbatim in the provided INFORMATION section. If no relevant link is available, omit the reference entirely.
 """
 
 # ── Per-category writer prompts ────────────────────────────────────────────────
 
 WRITER_PROMPT_CIRCUIT_DOWN = WRITER_BASE_PROMPT + """
 Category: circuit_down
+
+## Make changes to Action that suit the incident
 
 ACTION STEPS FOR NOC OFFICER:
 1. Acknowledge receipt of the incident report, noting the provider ticket reference and Nevigate circuit reference.
@@ -57,6 +71,8 @@ EMAIL CONTENT: {email_information}
 WRITER_PROMPT_LINK_FLAPPING = WRITER_BASE_PROMPT + """
 Category: link_flapping
 
+## Make changes to Action that suit the incident
+
 ACTION STEPS FOR NOC OFFICER:
 1. Acknowledge receipt of the request and note the provider internal ticket reference if provided.
 2. Request interface status logs and a specific timeline (including time zone) of the drops from the customer.
@@ -75,6 +91,8 @@ EMAIL CONTENT: {email_information}
 
 WRITER_PROMPT_PACKET_LOSS = WRITER_BASE_PROMPT + """
 Category: packet_loss
+
+## Make changes to Action that suit the incident
 
 ACTION STEPS FOR NOC OFFICER:
 1. Acknowledge the report and create an internal customer support ticket, referencing the provider's ticket number if provided.
@@ -95,11 +113,19 @@ EMAIL CONTENT: {email_information}
 WRITER_PROMPT_MAINTENANCE = WRITER_BASE_PROMPT + """
 Category: maintenance_notification
 
-Extract the following fields from the email and include in the SUMMARY section:
+## Make changes to Action that suit the incident
+
+Extract the following fields from the email and include in the SUMMARY section.
+For Start/End Date: convert to GMT+8.
+- If the email provides a timezone, convert from that timezone to GMT+8.
+- If NO timezone is provided, infer the timezone from the End Customer Installation Country in the CIRCUIT DETAILS (use the country's standard timezone, not DST). Then convert to GMT+8.
+- Always state what timezone was assumed and show the conversion.
+
 Start Date  : [DD MMM YYYY, HH:MM AM/PM GMT+8]
 End Date    : [DD MMM YYYY, HH:MM AM/PM GMT+8]
 Duration    : [activity duration]
 Outage      : [expected downtime]
+Timezone    : [original timezone from email, or "Assumed <TZ> based on country: <Country>"]
 
 ACTION STEPS FOR NOC OFFICER:
 1. Check whether maintenance is affecting any Nevigate circuits.
@@ -107,7 +133,7 @@ ACTION STEPS FOR NOC OFFICER:
 3. Notify Winston, Yusikmal or Shahmi via WhatsApp.
 4. Resolve the ticket if no further issue from customer.
 
-NOTES: Check the time if its correct.
+NOTES: Verify the converted time is correct before notifying the team.
 
 ---
 EMAIL CONTENT: {email_information}
@@ -115,6 +141,8 @@ EMAIL CONTENT: {email_information}
 
 WRITER_PROMPT_FORTITOKEN = WRITER_BASE_PROMPT + """
 Category: ewh_fortitoken
+
+## Make changes to Action that suit the incident
 
 Extract the following fields from the email and include in the SUMMARY section:
 Username : [extracted from email]
@@ -138,6 +166,8 @@ EMAIL CONTENT: {email_information}
 
 WRITER_PROMPT_GENERAL = WRITER_BASE_PROMPT + """
 Category: general_inquiry
+
+## Make changes to Action that suit the incident
 
 Write a procedure with steps to research, verify, and respond to the inquiry through the correct channel. Base steps on the retrieved SOP information provided.
 

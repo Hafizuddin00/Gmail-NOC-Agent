@@ -2,7 +2,7 @@
 scripts/create_index.py
 -----------------------
 One-off utility to build (or rebuild) the ChromaDB vector store from the
-raw SOP documents in the /data directory.
+raw SOP documents and CSV data files in the /data directory.
 
 Run from the project root:
     python scripts/create_index.py
@@ -12,6 +12,7 @@ import os
 import sys
 import time
 import shutil
+import csv
 
 # Allow imports from the project root when run directly
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -20,6 +21,7 @@ from langchain_community.document_loaders import TextLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_chroma import Chroma
+from langchain_core.documents import Document
 from dotenv import load_dotenv
 
 # ── Environment ────────────────────────────────────────────────────────────────
@@ -36,16 +38,18 @@ if os.path.exists(DB_DIR):
     print(f"[1/4] Clearing existing vectorstore at '{DB_DIR}'...")
     shutil.rmtree(DB_DIR)
 else:
-    print(f"[1/4] No existing vectorstore found — starting fresh.")
+    print(f"[1/4] No existing vectorstore found - starting fresh.")
 
-# ── 2. Load all .txt files from /data ─────────────────────────────────────────
+# ── 2. Load all .txt and .csv files from /data ────────────────────────────────
 print("[2/4] Loading source documents...")
-all_docs = []
+all_docs  = []
 txt_files = [f for f in os.listdir(DATA_DIR) if f.endswith(".txt")]
+csv_files = [f for f in os.listdir(DATA_DIR) if f.endswith(".csv")]
 
-if not txt_files:
-    raise RuntimeError("No .txt files found in /data directory.")
+if not txt_files and not csv_files:
+    raise RuntimeError("No .txt or .csv files found in /data directory.")
 
+# Load .txt files
 for filename in txt_files:
     path = os.path.join(DATA_DIR, filename)
     try:
@@ -56,10 +60,46 @@ for filename in txt_files:
     except Exception as e:
         print(f"  [!] Skipping '{filename}' - {e}")
 
+# Load .csv files — each row becomes one Document with a descriptive text block
+for filename in csv_files:
+    path = os.path.join(DATA_DIR, filename)
+    try:
+        csv_docs = []
+        with open(path, encoding="utf-8-sig", newline="") as f:
+            reader = csv.DictReader(f)
+            for i, row in enumerate(reader):
+                # Skip completely empty rows
+                if not any(v.strip() for v in row.values() if v):
+                    continue
+
+                # Build a readable text block from column: value pairs
+                lines = [f"{col}: {val}" for col, val in row.items() if val and val.strip()]
+                content = "\n".join(lines)
+
+                doc = Document(
+                    page_content=content,
+                    metadata={
+                        "source": filename,
+                        "row": i + 2,  # 1-indexed, +1 for header
+                        "sales_order": row.get("Sales Order Number", "").strip(),
+                        "customer": row.get("Customer Company", "").strip(),
+                        "end_customer": row.get("End Customer Company", "").strip(),
+                        "country": row.get("End Customer Installation Country", "").strip(),
+                        "service_type": row.get("Service Type", "").strip(),
+                    },
+                )
+                csv_docs.append(doc)
+
+        print(f"  [ok] Loaded '{filename}' ({len(csv_docs)} row(s) as documents)")
+        all_docs.extend(csv_docs)
+    except Exception as e:
+        print(f"  [!] Skipping '{filename}' - {e}")
+
 if not all_docs:
     raise RuntimeError("No documents were loaded. Check your /data directory.")
 
-print(f"  [ok] Total: {len(all_docs)} document(s) loaded from {len(txt_files)} file(s).")
+print(f"  [ok] Total: {len(all_docs)} document(s) loaded from "
+      f"{len(txt_files)} .txt file(s) and {len(csv_files)} .csv file(s).")
 
 # ── 3. Chunk documents ─────────────────────────────────────────────────────────
 print(f"[3/4] Splitting into chunks (size={CHUNK_SIZE}, overlap={CHUNK_OVERLAP})...")
@@ -114,6 +154,8 @@ retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
 test_queries = [
     "What is the procedure to request an EWH FortiToken?",
     "How do I reset a FortiToken?",
+    "What is the IP address for Aptiv Japan circuit?",
+    "Find the circuit details for NEV-SO20207951",
 ]
 
 for query in test_queries:
@@ -124,4 +166,4 @@ for query in test_queries:
     else:
         print("  [!] No results returned - check if the files was ingested correctly.")
 
-print("\n[DONE] Ingestion complete. The agent is ready to handle FortiToken emails.")
+print("\n[DONE] Ingestion complete. The agent is ready to handle NOC emails and circuit lookups.")

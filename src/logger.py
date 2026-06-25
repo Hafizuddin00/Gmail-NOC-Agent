@@ -20,14 +20,21 @@ os.makedirs(LOGS_DIR, exist_ok=True)
 
 
 # ── Formatter ──────────────────────────────────────────────────────────────────
-LOG_FORMAT = "%(asctime)s | %(levelname)-8s | %(name)-20s | %(message)s"
-DATE_FORMAT = "%Y-%m-%d %H:%M:%S UTC"
+LOG_FORMAT = "%(asctime)s | %(levelname)-8s | %(name)-32s | %(message)s"
+DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 
-class _UTCFormatter(logging.Formatter):
-    """Always format timestamps in UTC regardless of the local timezone."""
-    import time as _time
-    converter = _time.gmtime
+import time as _time
+from datetime import datetime, timezone, timedelta
+
+_TZ_UTC8 = timezone(timedelta(hours=8))
+
+def _utc8_time(*args):
+    return datetime.now(_TZ_UTC8).timetuple()
+
+
+class _UTC8Formatter(logging.Formatter):
+    converter = staticmethod(_utc8_time)
 
 
 # ── Handler: rotating file (10 MB max, keep 7 backups) ────────────────────────
@@ -38,7 +45,7 @@ def _build_file_handler() -> logging.Handler:
         backupCount=7,
         encoding="utf-8",
     )
-    handler.setFormatter(_UTCFormatter(fmt=LOG_FORMAT, datefmt=DATE_FORMAT))
+    handler.setFormatter(_UTC8Formatter(fmt=LOG_FORMAT, datefmt=DATE_FORMAT))
     handler.setLevel(logging.DEBUG)
     return handler
 
@@ -46,7 +53,7 @@ def _build_file_handler() -> logging.Handler:
 # ── Handler: console (stdout) ──────────────────────────────────────────────────
 def _build_console_handler() -> logging.Handler:
     handler = logging.StreamHandler(sys.stdout)
-    handler.setFormatter(_UTCFormatter(fmt=LOG_FORMAT, datefmt=DATE_FORMAT))
+    handler.setFormatter(_UTC8Formatter(fmt=LOG_FORMAT, datefmt=DATE_FORMAT))
     handler.setLevel(logging.INFO)
     return handler
 

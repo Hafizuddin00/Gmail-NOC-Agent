@@ -24,7 +24,7 @@ class Agents:
         # ── Vector store / retriever ──────────────────────────────────────────
         embeddings = GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-001")
         vectorstore = Chroma(persist_directory="db", embedding_function=embeddings)
-        self.retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
+        self.retriever = vectorstore.as_retriever(search_kwargs={"k": 4})
 
         # ── Categorize email chain ────────────────────────────────────────────
         self.categorize_email = (

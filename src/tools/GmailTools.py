@@ -72,7 +72,7 @@ class GmailToolsClass:
             before_timestamp = int(now.timestamp())
 
             # Query to get emails from the last 5 minutes addressed to the NOC inbox
-            query = f"after:{after_timestamp} before:{before_timestamp} to:nevigate-noc@nevigate.net"
+            query = f"after:{after_timestamp} before:{before_timestamp} "
             results = self.service.users().messages().list(
                 userId="me", q=query, maxResults=max_results
             ).execute()

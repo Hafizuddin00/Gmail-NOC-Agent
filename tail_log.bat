@@ -5,7 +5,8 @@
 
 setlocal
 
-set "ROOT=%~dp0..\.."
+set "ROOT=%~dp0"
+set "ROOT=%ROOT:~0,-1%"
 set "LOG_FILE=%ROOT%\logs\agent.log"
 
 if not exist "%LOG_FILE%" (

@@ -5,7 +5,8 @@
 
 setlocal
 
-set "ROOT=%~dp0..\.."
+set "ROOT=%~dp0"
+set "ROOT=%ROOT:~0,-1%"
 set "PID_FILE=%ROOT%\agent.pid"
 
 if not exist "%PID_FILE%" (

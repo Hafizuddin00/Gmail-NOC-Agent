@@ -29,12 +29,12 @@ PID_FILE = os.path.join(os.path.dirname(__file__), "agent.pid")
 def _write_pid():
     with open(PID_FILE, "w") as f:
         f.write(str(os.getpid()))
-    logger.info(f"Agent started | PID={os.getpid()} | PID file → {PID_FILE}")
+    logger.info(f"Agent started | PID={os.getpid()} | PID file -> {PID_FILE}")
 
 def _remove_pid():
     if os.path.exists(PID_FILE):
         os.remove(PID_FILE)
-    logger.info("PID file removed — agent stopped cleanly.")
+    logger.info("PID file removed - agent stopped cleanly.")
 
 # ── Graceful shutdown on SIGINT / SIGTERM ──────────────────────────────────────
 def _handle_signal(signum, frame):
@@ -85,7 +85,7 @@ if __name__ == "__main__":
     cycle = 0
     while True:
         cycle += 1
-        logger.info(f"── Cycle #{cycle} | Checking for new emails... ──")
+        logger.info(f"Cycle #{cycle} | Checking for new emails...")
 
         try:
             for output in app.stream(initial_state, config):
@@ -96,7 +96,7 @@ if __name__ == "__main__":
             logger.error(f"Unhandled exception in cycle #{cycle}: {exc}", exc_info=True)
 
         logger.info(
-            f"── Cycle #{cycle} done | Sleeping {CHECK_INTERVAL_SECONDS}s "
-            f"before next check ──"
+            f"Cycle #{cycle} done | Sleeping {CHECK_INTERVAL_SECONDS}s "
+            f"before next check"
         )
         time.sleep(CHECK_INTERVAL_SECONDS)

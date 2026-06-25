@@ -14,6 +14,8 @@ from .agents import Agents
 from .tools.GmailTools import GmailToolsClass
 from .tools.AttachmentParser import extract_text_attachments
 from .tools.LogDetector import is_log_content
+from .tools.CircuitLookup import lookup_circuit_from_email
+# from .tools.GoogleChatTools import send_to_google_chat as chat_send  # enable when switching to Google Chat
 from .state import GraphState, Email
 
 logger = logging.getLogger(__name__)
@@ -61,7 +63,7 @@ def call_with_retry(func, *args, label="Agent", **kwargs):
                 )
                 time.sleep(wait)
             else:
-                logger.error(f"[{label}] Rate limit — max retries reached. Skipping.")
+                logger.error(f"[{label}] Rate limit - max retries reached. Skipping.")
                 raise
 
 
@@ -92,7 +94,7 @@ class Nodes:
     def check_new_emails(self, state: GraphState) -> str:
         """Checks if there are new emails to process."""
         if len(state['emails']) == 0:
-            logger.info("Inbox empty — no new emails to process.")
+            logger.info("Inbox empty - no new emails to process.")
             return "empty"
         else:
             logger.info(f"Found {len(state['emails'])} email(s) to process.")
@@ -169,17 +171,24 @@ class Nodes:
             return "general inquiry"
 
     def construct_rag_queries(self, state: GraphState) -> GraphState:
-        """Constructs RAG queries and retrieves information in one step."""
+        """Retrieves SOP docs from vectorstore and circuit details from CSV lookup."""
         logger.info("Retrieving information from internal knowledge base (RAG)...")
-        email_content = state["current_email"].body
+        email = state["current_email"]
         email_category = state["email_category"]
 
-        # Use email body + category directly as the search query — no LLM call needed
-        search_query = f"{email_category}: {email_content}"
+        # --- RAG: vectorstore search ---
+        search_query = f"{email_category}: {email.body}"
         docs = self.agents.retriever.invoke(search_query)
-        retrieved = "\n\n".join([doc.page_content for doc in docs])
-
+        rag_text = "\n\n".join([doc.page_content for doc in docs])
         logger.info(f"RAG retrieved {len(docs)} document(s).")
+
+        # --- Direct CSV lookup: no LLM, no embedding ---
+        circuit_info = lookup_circuit_from_email(email.body, email.subject)
+        if circuit_info:
+            retrieved = f"{circuit_info}\n\n{rag_text}"
+        else:
+            retrieved = rag_text
+
         return {
             "rag_queries": [search_query],
             "retrieved_documents": retrieved
@@ -205,7 +214,7 @@ class Nodes:
             log_content = email.body
 
         if log_content:
-            logger.info("Log content detected — running log analysis...")
+            logger.info("Log content detected - running log analysis...")
             try:
                 log_analysis = call_with_retry(
                     self.agents.log_analyzer.invoke,
@@ -275,6 +284,24 @@ class Nodes:
         self.gmail_tools.create_draft_reply(state["current_email"], state["generated_email"])
         logger.info("Gmail draft created successfully.")
         return {"retrieved_documents": "", "trials": 0}
+
+    # --- Google Chat (disabled) ---
+    # REMOVE 'create_draft_response' above when enabling Google Chat 
+    #
+    # def send_to_google_chat(self, state: GraphState) -> GraphState:
+    #     email = state["current_email"]
+    #     logger.info(f"Sending procedure to Google Chat | subject={email.subject!r}")
+    #     from .tools.GoogleChatTools import send_to_google_chat as chat_send
+    #     success = chat_send(
+    #         subject=email.subject,
+    #         message_id=email.id,
+    #         procedure=state["generated_email"],
+    #     )
+    #     if success:
+    #         logger.info("Procedure sent to Google Chat successfully.")
+    #     else:
+    #         logger.error("Failed to send procedure to Google Chat.")
+    #     return {"retrieved_documents": "", "trials": 0}
 
     def skip_unrelated_email(self, state):
         """Skip unrelated email permanently and remove from emails list."""

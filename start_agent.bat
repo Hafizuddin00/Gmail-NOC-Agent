@@ -7,7 +7,8 @@
 setlocal
 
 :: ── Resolve project root (same folder as this script) ─────────
-set "ROOT=%~dp0..\.."
+set "ROOT=%~dp0"
+set "ROOT=%ROOT:~0,-1%"
 set "VENV_PYTHON=%ROOT%\venv\Scripts\pythonw.exe"
 set "MAIN=%ROOT%\main.py"
 set "PID_FILE=%ROOT%\agent.pid"

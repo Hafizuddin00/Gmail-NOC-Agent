@@ -21,6 +21,7 @@ class Workflow():
         workflow.add_node("email_writer", nodes.write_draft_email)
         workflow.add_node("log_analysis_writer", nodes.write_log_analysis)
         workflow.add_node("send_email", nodes.create_draft_response)
+#        workflow.add_node("send_to_google_chat", nodes.send_to_google_chat)
         workflow.add_node("skip_unrelated_email", nodes.skip_unrelated_email)
 
         # load inbox emails
@@ -60,9 +61,13 @@ class Workflow():
         # writer sends directly to draft
         workflow.add_edge("email_writer", "send_email")
         workflow.add_edge("log_analysis_writer", "send_email")
+#        # writer sends to Google Chat
+#        workflow.add_edge("email_writer", "send_to_google_chat")
+#        workflow.add_edge("log_analysis_writer", "send_to_google_chat")
 
         # check if there are still emails to be processed
         workflow.add_edge("send_email", "is_email_inbox_empty")
+#        workflow.add_edge("send_to_google_chat", "is_email_inbox_empty")
         workflow.add_edge("skip_unrelated_email", "is_email_inbox_empty")
 
         # Compile
