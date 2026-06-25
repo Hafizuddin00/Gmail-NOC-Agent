@@ -12,7 +12,10 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 
-SCOPES = ['https://www.googleapis.com/auth/gmail.modify']
+SCOPES = [
+    'https://www.googleapis.com/auth/gmail.modify',
+    'https://www.googleapis.com/auth/spreadsheets',
+]
 
 class GmailToolsClass:
     def __init__(self):
@@ -72,7 +75,8 @@ class GmailToolsClass:
             before_timestamp = int(now.timestamp())
 
             # Query to get emails from the last 5 minutes addressed to the NOC inbox
-            query = f"after:{after_timestamp} before:{before_timestamp} "
+            noc_email = os.environ.get("NOC_EMAIL", "")
+            query = f"after:{after_timestamp} before:{before_timestamp} to:{noc_email}"
             results = self.service.users().messages().list(
                 userId="me", q=query, maxResults=max_results
             ).execute()
@@ -139,7 +143,7 @@ class GmailToolsClass:
         # Create message with proper headers
         # Always address draft to the NOC inbox — never to the external sender
         message = self._create_html_email_message(
-            recipient=os.environ.get("NOC_EMAIL", os.environ["MY_EMAIL"]),
+            recipient=os.environ["NOC_EMAIL"],
             subject=email.subject,
             reply_text=reply_text
         )
@@ -186,13 +190,8 @@ class GmailToolsClass:
     def _should_skip_email(self, email_info):
         sender = email_info['sender']
 
-        # Skip own emails
-        if os.environ['MY_EMAIL'] in sender:
-            return True
-
-        # Skip emails labelled "Provisioning Emails"
-        if 'Provisioning Emails' in email_info.get('labels', []):
-            print(f"  Skipping email with 'Provisioning Emails' label: {email_info['subject']}")
+        # Skip own emails (sent from the NOC inbox itself)
+        if os.environ['NOC_EMAIL'] in sender:
             return True
 
         # Skip emails from blocked senders listed in skipped_senders.txt

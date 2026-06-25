@@ -27,6 +27,19 @@ class CategorizeEmailOutput(BaseModel):
     )
 
 
+class FortiTokenRequest(BaseModel):
+    username: str = Field(..., description="Username extracted from the email.")
+    email: str = Field(..., description="Email address extracted from the email.")
+    action: str = Field(
+        ...,
+        description=(
+            "Action to perform. Must be one of: 'add', 'resend', 'offboard-delete'. "
+            "Infer from context: activation/new = 'add', resend = 'resend', "
+            "offboard/delete/remove = 'offboard-delete'."
+        ),
+    )
+
+
 # ── RAG Query Generation ───────────────────────────────────────────────────────
 
 class RAGQueriesOutput(BaseModel):

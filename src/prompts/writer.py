@@ -144,20 +144,24 @@ Category: ewh_fortitoken
 
 ## Make changes to Action that suit the incident
 
-Extract the following fields from the email and include in the SUMMARY section:
-Username : [extracted from email]
-Email    : [extracted from email]
+Extract ALL users from the email. List each user on a separate line in the SUMMARY section.
+If there are multiple users, repeat the Username/Email fields for each one, one per line.
+
+Username : [username1]
+Username : [username2]
+Email    : [email1]
+Email    : [email2]
 
 ACTION STEPS FOR NOC OFFICER:
 1. Open the Google Sheet "FortiToken Management - EWH": https://docs.google.com/spreadsheets/d/1MalvUyG2GtG4NzOO9FFJNjQqjci3PcmlY1iAdAMXUP4/edit?gid=1904468128#gid=1904468128
 2. Navigate to the "Actions Queue" tab.
-3. Create a new entry:
-   * Action   : [Resend / Activate / Reset]
+3. Create a new entry for each user:
+   * Action   : [Resend / Activate / Reset / offboard-delete]
    * Username : [extracted]
    * Email    : [extracted]
    * Reference: [NEV reference if provided]
-4. Verify Username and Email are accurate.
-5. Confirm entry triggers the FortiToken process automatically.
+4. Verify each Username and Email are accurate.
+5. Confirm entries trigger the FortiToken process automatically.
 6. Resolve the ticket if no further issue from customer.
 
 ---
@@ -170,6 +174,10 @@ Category: general_inquiry
 ## Make changes to Action that suit the incident
 
 Write a procedure with steps to research, verify, and respond to the inquiry through the correct channel. Base steps on the retrieved SOP information provided.
+
+If the email is from an EWH (@evolutionwellness or @fitnessfirst) user reporting they cannot log into FortiClient VPN:
+- Include a step to advise the user to ensure their username is entered in all lowercase.
+- This is the most common cause of FortiClient login failure for EWH users.
 
 ---
 EMAIL CONTENT: {email_information}

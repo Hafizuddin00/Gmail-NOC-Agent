@@ -15,6 +15,7 @@ from .tools.GmailTools import GmailToolsClass
 from .tools.AttachmentParser import extract_text_attachments
 from .tools.LogDetector import is_log_content
 from .tools.CircuitLookup import lookup_circuit_from_email
+from .tools.GoogleSheetsFortiToken import validate_and_queue_fortitoken
 # from .tools.GoogleChatTools import send_to_google_chat as chat_send  # enable when switching to Google Chat
 from .state import GraphState, Email
 
@@ -202,14 +203,13 @@ class Nodes:
         """Writes a draft NOC action procedure based on the current email and retrieved information."""
         logger.info("Writing NOC action procedure (draft email)...")
 
-        # Format input to the writer agent
         email = state["current_email"]
+        category = state["email_category"]
 
         # Analyze attachments or log body content if present
         log_analysis = ""
         log_content = email.attachments or ""
 
-        # Also check body for pasted logs (even if no attachment)
         if not log_content and is_log_content(email.body):
             log_content = email.body
 
@@ -218,7 +218,7 @@ class Nodes:
             try:
                 log_analysis = call_with_retry(
                     self.agents.log_analyzer.invoke,
-                    {"log_content": log_content, "email_category": state["email_category"]},
+                    {"log_content": log_content, "email_category": category},
                     label="LogAnalyzer"
                 )
             except Exception as e:
@@ -230,15 +230,12 @@ class Nodes:
             if log_content else ""
         )
         inputs = (
-            f'# **EMAIL CATEGORY:** {state["email_category"]}\n\n'
+            f'# **EMAIL CATEGORY:** {category}\n\n'
             f'# **EMAIL CONTENT:**\n{email.body}'
             f'{attachment_section}\n\n'
             f'# **INFORMATION:**\n{state["retrieved_documents"]}'
         )
 
-        writer_messages = state.get('writer_messages', [])
-
-        category = state["email_category"]
         writer = self.agents.email_writers.get(category, self.agents.email_writers["general_inquiry"])
 
         draft_result = call_with_retry(
@@ -247,15 +244,69 @@ class Nodes:
             label="Writer"
         )
 
-        email = draft_result.email
+        draft_text = draft_result.email
         state["emails"].pop()
+
+        # --- FortiToken: parse draft and queue to Google Sheets (no extra LLM call) ---
+        # if category == "ewh_fortitoken":
+        #    draft_text = self._process_fortitoken_from_draft(draft_text)
 
         logger.info("Draft email written successfully.")
         return {
-            "generated_email": email,
+            "generated_email": draft_text,
             "trials": 0,
             "writer_messages": []
         }
+
+    def _process_fortitoken_from_draft(self, draft_text: str) -> str:
+        """
+        Parse Username(s), Email(s), and Action from the already-generated FortiToken draft,
+        then validate and queue each user to Google Sheets. Handles multiple users.
+        No additional LLM call needed.
+        """
+        import re
+
+        logger.info("FortiToken: parsing draft for sheet automation...")
+
+        # Extract ALL username and email fields (one per line from the draft)
+        usernames = [m.strip() for m in re.findall(r'Username\s*:\s*(.+)', draft_text, re.IGNORECASE)]
+        emails    = [m.strip() for m in re.findall(r'Email\s*:\s*(.+)',    draft_text, re.IGNORECASE)]
+
+        # Infer action from the draft text
+        action = ""
+        draft_lower = draft_text.lower()
+        if "offboard" in draft_lower or "delete" in draft_lower or "remove" in draft_lower:
+            action = "offboard-delete"
+        elif "resend" in draft_lower:
+            action = "resend"
+        elif "activate" in draft_lower or "add" in draft_lower:
+            action = "add"
+
+        if not usernames or not emails or not action:
+            missing = []
+            if not usernames: missing.append("Username")
+            if not emails:    missing.append("Email")
+            if not action:    missing.append("Action")
+            msg = f"Could not parse from draft: {', '.join(missing)}. Manual entry required."
+            logger.warning(f"FortiToken: {msg}")
+            return draft_text + f"\n\n[FORTITOKEN AUTOMATION]: {msg}"
+
+        # Pair up usernames and emails by position
+        results = []
+        for i, username in enumerate(usernames):
+            email_addr = emails[i] if i < len(emails) else ""
+            if not email_addr:
+                results.append(f"  - {username}: no matching email found, skipped.")
+                continue
+
+            logger.info(f"FortiToken: processing {username} / {email_addr} / {action}")
+            success, message = validate_and_queue_fortitoken(username, email_addr, action)
+            status = "QUEUED" if success else "FAILED"
+            results.append(f"  - {username} ({email_addr}): {status} - {message}")
+
+        summary = "\n".join(results)
+        logger.info(f"FortiToken batch complete:\n{summary}")
+        return draft_text + f"\n\n[FORTITOKEN AUTOMATION RESULTS]:\n{summary}"
 
     def write_log_analysis(self, state: GraphState) -> GraphState:
         """Runs log analysis directly — skips RAG, outputs findings only."""
