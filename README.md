@@ -219,6 +219,9 @@ The system is built to optionally send procedures to a Google Chat space instead
 2. In `src/graph.py`, comment out the `send_email` lines and uncomment the `send_to_google_chat` lines.
 3. In `src/nodes.py`, uncomment the `send_to_google_chat` method.
 
+## Enabled FortiToken Automation
+
+1. Uncomment lines 252-253 in `nodes.py`.
 ---
 
 ## Resetting the Agent

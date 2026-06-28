@@ -248,8 +248,8 @@ class Nodes:
         state["emails"].pop()
 
         # --- FortiToken: parse draft and queue to Google Sheets (no extra LLM call) ---
-        # if category == "ewh_fortitoken":
-        #    draft_text = self._process_fortitoken_from_draft(draft_text)
+        if category == "ewh_fortitoken":
+            draft_text = self._process_fortitoken_from_draft(draft_text)
 
         logger.info("Draft email written successfully.")
         return {
@@ -268,9 +268,13 @@ class Nodes:
 
         logger.info("FortiToken: parsing draft for sheet automation...")
 
-        # Extract ALL username and email fields (one per line from the draft)
-        usernames = [m.strip() for m in re.findall(r'Username\s*:\s*(.+)', draft_text, re.IGNORECASE)]
-        emails    = [m.strip() for m in re.findall(r'Email\s*:\s*(.+)',    draft_text, re.IGNORECASE)]
+        # Only parse from the SUMMARY section to avoid duplicate matches in ACTION STEPS
+        summary_match = re.search(r'SUMMARY OF REQUEST:(.*?)(?:CIRCUIT DETAILS:|ACTION STEPS)', draft_text, re.IGNORECASE | re.DOTALL)
+        parse_text = summary_match.group(1) if summary_match else draft_text
+
+        # Extract ALL username and email fields (one per line from the summary)
+        usernames = [m.strip() for m in re.findall(r'Username\s*:\s*(.+)', parse_text, re.IGNORECASE)]
+        emails    = [m.strip() for m in re.findall(r'Email\s*:\s*(.+)',    parse_text, re.IGNORECASE)]
 
         # Infer action from the draft text
         action = ""
